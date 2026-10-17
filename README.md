@@ -14,8 +14,8 @@ built by GitHub Actions and are not committed here.
 
 ## Publication source
 
-The initial website is pinned to source commit
-[`efb6c361ca06b763da9a3b6f98f0123023e8fc8e`](https://github.com/TheHiddenObserver/statgpu/commit/efb6c361ca06b763da9a3b6f98f0123023e8fc8e)
+The current website is pinned to source commit
+[`15045f1b512edbc11117ef51952c93090f49744c`](https://github.com/TheHiddenObserver/statgpu/commit/15045f1b512edbc11117ef51952c93090f49744c)
 from [PR #132](https://github.com/TheHiddenObserver/statgpu/pull/132).
 Publishing this revision does not merge the PR or change the source repository.
 
@@ -47,7 +47,7 @@ secret, or global workflow-permission change is needed.
 
 本站发布在 <https://statgpu.github.io/>，文档、前端代码和基准数据仍在
 [`TheHiddenObserver/statgpu`](https://github.com/TheHiddenObserver/statgpu)
-维护。首次发布固定使用上方的完整提交 SHA，不会合并 PR #132。
+维护。当前发布固定使用上方的完整提交 SHA，不会合并 PR #132。
 
 源项目的推送或合并不会自动更新网站。发布新版本时，应将部署工作流中的
 两个源代码提交 SHA 同步更新为已检查的版本，并更新此页的版本记录。
