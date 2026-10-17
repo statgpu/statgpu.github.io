@@ -1,0 +1,177 @@
+name: Deploy statgpu organization website
+
+# Upstream changes do not automatically update this site. Review and update the
+# pinned source revision below when publishing a new version.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: statgpu-pages
+  cancel-in-progress: false
+
+jobs:
+  python-data:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.11']
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: TheHiddenObserver/statgpu
+          ref: efb6c361ca06b763da9a3b6f98f0123023e8fc8e
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install validation dependencies
+        run: python -m pip install -U pip pytest 'jsonschema[format]'
+      - name: Validate documentation links and website routes
+        run: |
+          python dev/validation/check_docs_contracts.py
+          python dev/validation/fix_docs_links.py --check
+          pytest dev/tests/test_website_source_routes.py dev/tests/test_pr168_audience_boundaries.py -v
+      - name: Validate executable Lasso inference companion
+        run: |
+          python -m pip install -e .
+          pytest dev/tests/test_lasso_inference_companion_docs.py -v
+      - name: Run generator and parser tests
+        run: |
+          pytest \
+            dev/tests/test_benchmark_frontend_data.py \
+            dev/tests/test_benchmark_catalog.py \
+            dev/tests/test_benchmark_inventory_v2.py \
+            dev/tests/test_benchmark_cv_source.py \
+            dev/tests/test_cv_runner_instrumentation.py \
+            dev/tests/test_frontend_contracts.py \
+            dev/tests/test_frontend_cv_determinism.py \
+            dev/tests/test_frontend_domain_coverage.py \
+            dev/tests/test_panel_stage_b_frontend_source.py \
+            dev/tests/test_panel_stage_b_applicable_hausman_parser.py \
+            dev/tests/test_panel_stage_c_frontend_source.py -v
+      - name: Validate canonical generator inputs
+        run: python dev/benchmarks/generate_benchmark_data.py --check --strict-sources
+
+  site:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    needs: python-data
+    permissions:
+      contents: read
+    env:
+      STATGPU_SITE_BASE: /
+      STATGPU_SITE_URL: https://statgpu.github.io/
+      NO_PROXY: 127.0.0.1,localhost
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: TheHiddenObserver/statgpu
+          ref: efb6c361ca06b763da9a3b6f98f0123023e8fc8e
+          persist-credentials: false
+          # VitePress lastUpdated derives page timestamps from git history.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.node-version'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - name: Verify pinned npm version
+        run: test "$(npm --version)" = "11.6.2"
+      - name: Reject tracked generated website artifacts
+        run: |
+          node --test scripts/test-tracked-artifacts.mjs
+          node scripts/check-tracked-artifacts.mjs
+      - name: Install build dependencies
+        run: |
+          python -m pip install pytest 'jsonschema[format]'
+          npm ci
+          npm ci --prefix frontend
+      - name: Test documentation search, source links, and HTML validation
+        run: |
+          npm run test:search
+          npm run test:site-links
+          npm run test:site-html
+          npm run source:verify
+      - name: Test documented production build from clean generated directories
+        run: npm run test:production-recipe
+      - name: Generate deployment benchmark bundle
+        run: |
+          python dev/benchmarks/generate_benchmark_data.py \
+            --out frontend/public/data/benchmark_data.json \
+            --report frontend/public/data/parse_report.json \
+            --inventory-out frontend/public/data/source_inventory.json \
+            --deterministic --strict-sources
+      - name: Typecheck dashboard
+        run: npm run typecheck --prefix frontend
+      - name: Build and verify assembled site
+        run: npm run site:build
+      - name: Capture organization-site build hash
+        run: npm run --silent site:hash > "${RUNNER_TEMP}/site-hash-first"
+      - name: Verify project-path compatibility
+        env:
+          STATGPU_SITE_BASE: /statgpu/
+          STATGPU_SITE_URL: https://thehiddenobserver.github.io/statgpu/
+        run: npm run site:build
+      - name: Restore and verify reproducible organization-site build
+        run: |
+          npm run site:build
+          npm run --silent site:hash > "${RUNNER_TEMP}/site-hash-second"
+          diff -u "${RUNNER_TEMP}/site-hash-first" "${RUNNER_TEMP}/site-hash-second"
+      - name: Verify repository tree remains clean
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Install browser engines
+        run: npm exec --prefix frontend -- playwright install --with-deps chromium firefox webkit
+      - name: Run dashboard regression suite
+        run: npm run test:e2e --prefix frontend
+      - name: Run assembled production QA
+        run: npm run test:e2e:production --prefix frontend
+      - name: Verify repository tree remains clean after browser QA
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Upload Playwright reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-playwright-reports
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 30
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .site-dist
+
+  deploy:
+    timeout-minutes: 10
+    needs: site
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
