@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: TheHiddenObserver/statgpu
-          ref: 7e6ae48c839ff22b9488f6088bec80d2d558e911
+          ref: 227aca4358c35a73380c7cab965fbff9b334f150
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: TheHiddenObserver/statgpu
-          ref: 7e6ae48c839ff22b9488f6088bec80d2d558e911
+          ref: 227aca4358c35a73380c7cab965fbff9b334f150
           persist-credentials: false
           # VitePress lastUpdated derives page timestamps from git history.
           fetch-depth: 0
