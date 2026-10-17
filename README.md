@@ -15,7 +15,7 @@ built by GitHub Actions and are not committed here.
 ## Publication source
 
 The current website is pinned to source commit
-[`15045f1b512edbc11117ef51952c93090f49744c`](https://github.com/TheHiddenObserver/statgpu/commit/15045f1b512edbc11117ef51952c93090f49744c)
+[`7e6ae48c839ff22b9488f6088bec80d2d558e911`](https://github.com/TheHiddenObserver/statgpu/commit/7e6ae48c839ff22b9488f6088bec80d2d558e911)
 from [PR #132](https://github.com/TheHiddenObserver/statgpu/pull/132).
 Publishing this revision does not merge the PR or change the source repository.
 
